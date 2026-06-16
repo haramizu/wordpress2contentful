@@ -1,0 +1,14 @@
+{
+  "name": "wordpress-to-contentful-migration",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "WordPress to Contentful Migration scripts",
+  "main": "scripts/cleanup.js",
+  "scripts": {
+    "cleanup": "node scripts/cleanup.js"
+  },
+  "dependencies": {
+    "contentful-management": "^11.33.0",
+    "dotenv": "^16.4.5"
+  }
+}

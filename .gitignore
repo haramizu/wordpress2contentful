@@ -1,0 +1,14 @@
+## 環境変数
+.env.local
+
+## Wordpress データ
+wordpress/content/*.xml
+wordpress/media/*
+!wordpress/media/.gitkeep
+wordpress/*.tar
+
+## node
+node_modules
+
+## macOS
+.DS_Store
