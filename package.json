@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "contentful-management": "^11.33.0",
-    "dotenv": "^16.4.5"
+    "dotenv": "^16.4.5",
+    "fast-xml-parser": "^5.9.0"
   }
 }

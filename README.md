@@ -62,6 +62,10 @@ CONTENTFUL_PREVIEW_ACCESS_TOKEN=YOUR_PREVIEW_ACCESS_TOKEN
 # 移行先の環境ID (デフォルト: master)
 # 通常は sandbox 環境や master 環境を指定します。
 CONTENTFUL_ENVIRONMENT=master
+
+# 移行先デフォルトロケール（デフォルト: ja-JP）
+# お使いの Contentful スペースのロケールに合わせて指定してください（例: ja-JP, en-US など）。
+CONTENTFUL_LOCALE=ja-JP
 ```
 
 ---
@@ -122,6 +126,10 @@ npm run media-upload
 - [wordpress/](./wordpress)
   - [content/](./wordpress/content) - WordPress の記事・固定ページなどのXMLエクスポートデータ（`WordPress.YYYY-MM-DD.xml` などの形式で配置）
   - [media/](./wordpress/media) - WordPress のメディアファイル（画像など）の展開先ディレクトリ
+- [scripts/](./scripts)
+  - [cleanup.js](./scripts/cleanup.js) - Contentful環境の全エントリー、アセット、コンテンツモデルを一括削除して初期化するクリーンアップスクリプト
+  - [setup.js](./scripts/setup.js) - 移行に必要なコンテンツモデル（Category, Tag, Blog Post）の作成・更新および、最新のXMLファイルの検証を行うセットアップスクリプト
+  - [media-upload.js](./scripts/media-upload.js) - ローカルメディアのアップロードと、XMLからのタイトル・代替テキスト（alt）自動抽出・反映を行うアセットアップロードスクリプト
 - [.env.example](./.env.example) - 環境変数のテンプレートファイル
 - [.env](./.env) - ローカル環境変数設定ファイル（Git除外推奨）
 - [README.md](./README.md) - 本ファイル

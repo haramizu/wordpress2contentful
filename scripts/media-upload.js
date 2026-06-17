@@ -3,6 +3,7 @@ import path from 'path';
 import crypto from 'crypto';
 import contentfulManagement from 'contentful-management';
 import dotenv from 'dotenv';
+import { XMLParser } from 'fast-xml-parser';
 
 // Load environment variables
 dotenv.config({ path: path.resolve(process.cwd(), '.env.local') });
@@ -59,10 +60,124 @@ function getFilesRecursively(dir, fileList = []) {
 
 // Generate deterministic Asset ID using relative path MD5 hash
 function generateAssetId(relativePath) {
-  // Replace slashes/backslashes to ensure uniformity across platforms
   const normalizedPath = relativePath.replace(/\\/g, '/');
   const hash = crypto.createHash('md5').update(normalizedPath).digest('hex');
   return `wp_media_${hash}`;
+}
+
+// Finds the latest WordPress XML export file under wordpress/content/
+function getLatestXmlPath() {
+  const contentDir = path.resolve(process.cwd(), 'wordpress/content');
+  if (!fs.existsSync(contentDir)) {
+    throw new Error(`Directory does not exist: ${contentDir}`);
+  }
+
+  const files = fs.readdirSync(contentDir);
+  const xmlFiles = files
+    .filter(file => /^WordPress\.\d{4}-\d{2}-\d{2}\.xml$/.test(file))
+    .map(file => {
+      const match = file.match(/^WordPress\.(\d{4}-\d{2}-\d{2})\.xml$/);
+      return {
+        filename: file,
+        filePath: path.join(contentDir, file),
+        date: new Date(match[1])
+      };
+    })
+    .filter(item => !isNaN(item.date.getTime()));
+
+  if (xmlFiles.length === 0) {
+    throw new Error('No matching WordPress XML files found in wordpress/content/');
+  }
+
+  xmlFiles.sort((a, b) => b.date - a.date);
+  return xmlFiles[0].filePath;
+}
+
+// Parses XML and extracts attachments metadata map
+function parseAttachmentsFromXml(xmlPath) {
+  console.log(`Parsing XML file for attachment metadata: ${xmlPath}`);
+  const xmlContent = fs.readFileSync(xmlPath, 'utf-8');
+  const parser = new XMLParser({
+    ignoreAttributes: false,
+    parseAttributeValue: true
+  });
+  const jsonObj = parser.parse(xmlContent);
+
+  const items = Array.isArray(jsonObj.rss?.channel?.item) 
+    ? jsonObj.rss.channel.item 
+    : (jsonObj.rss?.channel?.item ? [jsonObj.rss.channel.item] : []);
+
+  const attachmentMap = {};
+
+  for (const item of items) {
+    if (item['wp:post_type'] === 'attachment') {
+      const attachmentUrl = item['wp:attachment_url'] || '';
+      if (!attachmentUrl) continue;
+
+      // Extract relative path from upload url (e.g. wp-content/uploads/2013/01/img.jpg)
+      const match = attachmentUrl.match(/wp-content\/uploads\/(.+)$/);
+      if (!match) continue;
+      const relativePath = decodeURIComponent(match[1]).replace(/\\/g, '/');
+
+      // Extract description
+      let description = '';
+      if (typeof item.description === 'string' && item.description.trim()) {
+        description = item.description.trim();
+      } else if (typeof item['excerpt:encoded'] === 'string' && item['excerpt:encoded'].trim()) {
+        description = item['excerpt:encoded'].trim();
+      }
+
+      // Check for alt text in postmeta
+      const postmetaList = item['wp:postmeta']
+        ? (Array.isArray(item['wp:postmeta']) ? item['wp:postmeta'] : [item['wp:postmeta']])
+        : [];
+      for (const meta of postmetaList) {
+        if (meta['wp:meta_key'] === '_wp_attachment_image_alt' && typeof meta['wp:meta_value'] === 'string') {
+          const altVal = meta['wp:meta_value'].trim();
+          if (altVal) {
+            description = description ? `${description} (Alt: ${altVal})` : altVal;
+          }
+        }
+      }
+
+      const title = typeof item.title === 'string' && item.title.trim() 
+        ? item.title.trim() 
+        : path.basename(relativePath);
+      attachmentMap[relativePath] = {
+        title,
+        description
+      };
+    }
+  }
+
+  // Second pass: scrape alt text from post/page content for missing descriptions
+  for (const item of items) {
+    const postType = item['wp:post_type'];
+    const content = item['content:encoded'];
+    if ((postType === 'post' || postType === 'page') && typeof content === 'string' && content.trim()) {
+      const imgTags = content.match(/<img[^>]+>/gi) || [];
+      for (const tag of imgTags) {
+        const srcMatch = tag.match(/src=["']([^"']+)["']/i);
+        const altMatch = tag.match(/alt=["']([^"']+)["']/i);
+        if (srcMatch && altMatch) {
+          const src = srcMatch[1];
+          const alt = altMatch[1].trim();
+          if (alt) {
+            const pathMatch = src.match(/wp-content\/uploads\/(.+?)(?:\?|$)/);
+            if (pathMatch) {
+              const relPath = decodeURIComponent(pathMatch[1]).replace(/\\/g, '/');
+              if (attachmentMap[relPath] && !attachmentMap[relPath].description) {
+                attachmentMap[relPath].description = alt;
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  console.log(`Extracted metadata for ${Object.keys(attachmentMap).length} attachments.`);
+  return attachmentMap;
 }
 
 async function uploadMedia() {
@@ -75,11 +190,20 @@ async function uploadMedia() {
   const environment = await space.getEnvironment(environmentId);
 
   const locales = await environment.getLocales();
-  const defaultLocale = locales.items.find((l) => l.default).code;
+  const defaultLocale = process.env.CONTENTFUL_LOCALE || locales.items.find((l) => l.default).code;
 
   console.log(`Target Space: ${spaceId}`);
   console.log(`Target Environment: ${environmentId}`);
   console.log(`Default Locale: ${defaultLocale}`);
+
+  // Resolve and parse latest XML file to get descriptions
+  let attachmentMetadata = {};
+  try {
+    const latestXmlPath = getLatestXmlPath();
+    attachmentMetadata = parseAttachmentsFromXml(latestXmlPath);
+  } catch (err) {
+    console.warn(`Warning: Could not parse XML for attachment descriptions (${err.message}). Uploading without description fallback.`);
+  }
 
   const mediaDir = path.resolve(process.cwd(), 'wordpress/media');
   if (!fs.existsSync(mediaDir)) {
@@ -96,13 +220,19 @@ async function uploadMedia() {
 
   for (let i = 0; i < allFiles.length; i++) {
     const filePath = allFiles[i];
-    const relativePath = path.relative(mediaDir, filePath);
+    const relativePath = path.relative(mediaDir, filePath).replace(/\\/g, '/');
     const assetId = generateAssetId(relativePath);
     const fileName = path.basename(filePath);
     const mimeType = getMimeType(filePath);
 
+    // Get metadata from XML extraction
+    const meta = attachmentMetadata[relativePath] || { title: fileName, description: '' };
+
     console.log(`\n[${i + 1}/${allFiles.length}] Processing: ${relativePath}`);
     console.log(`Computed Asset ID: ${assetId}`);
+    if (meta.description) {
+      console.log(`Metadata Description: ${meta.description}`);
+    }
 
     try {
       // Check if asset already exists
@@ -126,7 +256,10 @@ async function uploadMedia() {
         asset = await environment.createAssetWithId(assetId, {
           fields: {
             title: {
-              [defaultLocale]: fileName,
+              [defaultLocale]: meta.title,
+            },
+            description: {
+              [defaultLocale]: meta.description,
             },
             file: {
               [defaultLocale]: {
@@ -143,13 +276,11 @@ async function uploadMedia() {
             },
           },
         });
-        await sleep(350);
       }
 
       // Process asset
       console.log(`Processing asset for locale ${defaultLocale}...`);
       asset = await asset.processForLocale(defaultLocale);
-      await sleep(500);
 
       // Wait until processed
       let processed = false;
@@ -162,7 +293,7 @@ async function uploadMedia() {
         } else {
           checkAttempts++;
           console.log(`Waiting for asset processing (attempt ${checkAttempts}/10)...`);
-          await sleep(1500);
+          await sleep(200);
         }
       }
 
@@ -175,9 +306,6 @@ async function uploadMedia() {
       await asset.publish();
       console.log(`Successfully published asset: ${assetId}`);
       successCount++;
-      
-      // Delay to respect rate limits
-      await sleep(350);
     } catch (err) {
       console.error(`Failed to process/upload asset ${relativePath}:`, err.message);
     }
