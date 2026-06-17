@@ -7,12 +7,11 @@ WordPress のエクスポートデータ（XML・メディアアーカイブ）�
 
 ## 移行元データ情報
 - **XML データ:** `wordpress/content/` 配下に配置された WordPress のXMLエクスポートデータ（例: `WordPress.2026-06-16.xml` など）
-- **メディアアーカイブ:** [media-export-197841949-from-0-to-1255.tar](./wordpress/media-export-197841949-from-0-to-1255.tar) (約1.6GB)
-  - 解凍先: `wordpress/media/` ディレクトリ配下
+- **メディアアーカイブ:** `wordpress/media/` は以下に配置された WordPress からエクスポートをしたメディアファイルの展開先ディレクトリです。メディアファイルが圧縮されている場合は `tar` コマンドで展開を行ってください。
 
-## 設定・環境変数 (`.env.local`)
+## 設定・環境変数 (`.env`)
 移行処理には Contentful にデータを書き込むための以下の環境変数が必要です。
-ローカル開発時は [.env.local](./.env.local) に定義します。
+ローカル開発時は [.env](./.env) に定義します。
 
 - `CONTENTFUL_SPACE_ID`: 対象スペースID
 - `CONTENTFUL_MANAGEMENT_TOKEN`: 管理用トークン（CMA / 必須）

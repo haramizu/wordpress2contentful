@@ -1,5 +1,5 @@
 ## 環境変数
-.env.local
+.env
 
 ## Wordpress データ
 wordpress/content/*.xml

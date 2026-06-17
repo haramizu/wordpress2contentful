@@ -28,19 +28,19 @@ tar -xvf wordpress/media-export-197841949-from-0-to-1255.tar -C wordpress/media/
 
 ---
 
-### 2. 環境変数の設定 (`.env.local`)
+### 2. 環境変数の設定 (`.env`)
 
 Contentful API にアクセスするための認証情報を設定します。
 
-プロジェクトのルートディレクトリに `.env.local` ファイルを作成し、必要なAPI情報を記載してください。
+プロジェクトのルートディレクトリに `.env` ファイルを作成し、必要なAPI情報を記載してください。
 
 #### 設定用ファイル作成
 ```bash
-cp .env.example .env.local
+cp .env.example .env
 ```
-*(※ すでに `.env.local` が作成されている場合は、直接そちらを編集してください)*
+*(※ すでに `.env` が作成されている場合は、直接そちらを編集してください)*
 
-#### `.env.local` の設定項目
+#### `.env` の設定項目
 
 ```env
 # Contentful のスペースID
@@ -71,7 +71,7 @@ CONTENTFUL_ENVIRONMENT=master
 移行テストを複数回実行する場合など、Contentful 上のエントリーやアセットをすべて削除して初期状態にクリーンアップするためのスクリプトが用意されています。
 
 > [!WARNING]
-> このスクリプトは、設定されたスペースおよび環境内の**すべてのエントリーとアセットを削除**します。実行前に必ず `.env.local` の設定対象環境を確認してください。
+> このスクリプトは、設定されたスペースおよび環境内の**すべてのエントリーとアセットを削除**します。実行前に必ず `.env` の設定対象環境を確認してください。
 
 #### クリーンアップの実行手順
 
@@ -98,9 +98,8 @@ CONTENTFUL_ENVIRONMENT=master
 - [wordpress/](./wordpress)
   - [content/](./wordpress/content) - WordPress の記事・固定ページなどのXMLエクスポートデータ（`WordPress.YYYY-MM-DD.xml` などの形式で配置）
   - [media/](./wordpress/media) - WordPress のメディアファイル（画像など）の展開先ディレクトリ
-  - `media-export-197841949-from-0-to-1255.tar` - WordPress のメディアファイルアーカイブ
 - [.env.example](./.env.example) - 環境変数のテンプレートファイル
-- [.env.local](./.env.local) - ローカル環境変数設定ファイル（Git除外推奨）
+- [.env](./.env) - ローカル環境変数設定ファイル（Git除外推奨）
 - [README.md](./README.md) - 本ファイル
 - [GEMINI.md](./GEMINI.md) - AIアシスタント向け開発コンテキスト
 
