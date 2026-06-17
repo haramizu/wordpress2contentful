@@ -54,11 +54,12 @@ function getLatestXmlPath() {
   return xmlFiles[0].filePath;
 }
 
-async function getOrCreateContentType(environment, id, name, fields) {
+async function getOrCreateContentType(environment, id, name, fields, displayField) {
   try {
     let contentType = await environment.getContentType(id);
     console.log(`Content Type "${id}" already exists. Updating fields...`);
     contentType.fields = fields;
+    contentType.displayField = displayField;
     contentType = await contentType.update();
     await sleep(350);
     contentType = await contentType.publish();
@@ -70,6 +71,7 @@ async function getOrCreateContentType(environment, id, name, fields) {
     console.log(`Creating Content Type "${id}"...`);
     let contentType = await environment.createContentTypeWithId(id, {
       name,
+      displayField,
       fields
     });
     await sleep(350);
@@ -133,7 +135,7 @@ async function setupContentTypes(environment) {
     {
       id: 'content',
       name: 'Content',
-      type: 'Text' // Long text in Contentful
+      type: 'RichText'
     },
     {
       id: 'excerpt',
@@ -192,9 +194,9 @@ async function setupContentTypes(environment) {
   ];
 
   console.log('Setting up Content Types...');
-  await getOrCreateContentType(environment, 'category', 'Category', categoryFields);
-  await getOrCreateContentType(environment, 'tag', 'Tag', tagFields);
-  await getOrCreateContentType(environment, 'blogPost', 'Blog Post', blogPostFields);
+  await getOrCreateContentType(environment, 'category', 'Category', categoryFields, 'name');
+  await getOrCreateContentType(environment, 'tag', 'Tag', tagFields, 'name');
+  await getOrCreateContentType(environment, 'blogPost', 'Blog Post', blogPostFields, 'title');
   console.log('Content Types setup finished successfully!');
 }
 

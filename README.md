@@ -95,6 +95,11 @@ CONTENTFUL_LOCALE=ja-JP
    npm run cleanup -- --confirm
    ```
 
+   - **アセット（メディアファイル）を削除せずに残したい場合:**
+     ```bash
+     npm run cleanup -- --confirm --keep-media
+     ```
+
 ---
 
 ### 4. Contentful 環境のセットアップ（Content Type作成）
@@ -121,6 +126,22 @@ npm run media-upload
 
 ---
 
+### 6. エントリーデータ（記事・カテゴリ・タグ）のアップロード
+
+パースしたXMLからカテゴリ、タグ、記事データ（Blog Post）を読み込み、Contentful の該当コンテンツモデルへ移行・登録します。
+
+- すべてのカテゴリ・タグが自動的に作成および公開（Publish）されます。
+- 記事の移行時、対応するカテゴリ、タグ、および featuredImage（アイキャッチ画像など）の参照リンク（References）が自動的に紐付きます。
+- 移行されたエントリーは決定論的 ID（例: `wp_post_<wordpressId>`）を持つため、再実行時は安全に更新（上書き）され、二重登録は発生しません。
+- 元の WordPress のステータスが `publish` の記事のみ、アップロード後に自動公開（Publish）されます。
+
+#### コンテンツアップロードの実行
+```bash
+npm run content-upload
+```
+
+---
+
 ## プロジェクト構成
 
 - [wordpress/](./wordpress)
@@ -130,6 +151,7 @@ npm run media-upload
   - [cleanup.js](./scripts/cleanup.js) - Contentful環境の全エントリー、アセット、コンテンツモデルを一括削除して初期化するクリーンアップスクリプト
   - [setup.js](./scripts/setup.js) - 移行に必要なコンテンツモデル（Category, Tag, Blog Post）の作成・更新および、最新のXMLファイルの検証を行うセットアップスクリプト
   - [media-upload.js](./scripts/media-upload.js) - ローカルメディアのアップロードと、XMLからのタイトル・代替テキスト（alt）自動抽出・反映を行うアセットアップロードスクリプト
+  - [content-upload.js](./scripts/content-upload.js) - XMLデータをパースし、カテゴリ、タグ、記事エントリー（参照リンク紐付け、アイキャッチ紐付けを含む）をContentfulへアップロードするスクリプト
 - [.env.example](./.env.example) - 環境変数のテンプレートファイル
 - [.env](./.env) - ローカル環境変数設定ファイル（Git除外推奨）
 - [README.md](./README.md) - 本ファイル

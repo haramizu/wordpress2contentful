@@ -7,11 +7,13 @@
   "scripts": {
     "cleanup": "node scripts/cleanup.js",
     "setup": "node scripts/setup.js",
-    "media-upload": "node scripts/media-upload.js"
+    "media-upload": "node scripts/media-upload.js",
+    "content-upload": "node scripts/content-upload.js"
   },
   "dependencies": {
     "contentful-management": "^11.33.0",
     "dotenv": "^16.4.5",
-    "fast-xml-parser": "^5.9.0"
+    "fast-xml-parser": "^5.9.0",
+    "node-html-parser": "^7.1.0"
   }
 }

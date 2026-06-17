@@ -225,6 +225,14 @@ async function uploadMedia() {
     const fileName = path.basename(filePath);
     const mimeType = getMimeType(filePath);
 
+    // Skip 0-byte files
+    const stats = fs.statSync(filePath);
+    if (stats.size === 0) {
+      console.log(`\n[${i + 1}/${allFiles.length}] Skipping 0-byte file: ${relativePath}`);
+      skipCount++;
+      continue;
+    }
+
     // Get metadata from XML extraction
     const meta = attachmentMetadata[relativePath] || { title: fileName, description: '' };
 

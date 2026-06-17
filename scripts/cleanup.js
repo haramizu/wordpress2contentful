@@ -16,6 +16,7 @@ if (!spaceId || !cmaToken) {
 }
 
 const isConfirmed = process.argv.includes('--confirm');
+const keepAssets = process.argv.includes('--keep-assets') || process.argv.includes('--keep-media');
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -89,33 +90,37 @@ async function cleanup() {
   });
 
   // --- Clean Up Assets ---
-  console.log('\nFetching assets...');
-  let assets = [];
-  skip = 0;
-  while (true) {
-    const response = await environment.getAssets({ skip, limit });
-    assets.push(...response.items);
-    if (response.items.length < limit) break;
-    skip += limit;
-  }
-  console.log(`Found ${assets.length} assets.`);
-
-  let assetCount = 0;
-  await asyncPool(2, assets, async (asset) => {
-    const current = ++assetCount;
-    try {
-      if (asset.isPublished()) {
-        console.log(`[${current}/${assets.length}] Unpublishing asset: ${asset.sys.id}`);
-        await asset.unpublish();
-        await sleep(350);
-      }
-      console.log(`[${current}/${assets.length}] Deleting asset: ${asset.sys.id}`);
-      await asset.delete();
-      await sleep(350);
-    } catch (err) {
-      console.error(`Failed to delete asset ${asset.sys.id}:`, err.message);
+  if (keepAssets) {
+    console.log('\nSkipping asset (media) cleanup (--keep-media flag set).');
+  } else {
+    console.log('\nFetching assets...');
+    let assets = [];
+    skip = 0;
+    while (true) {
+      const response = await environment.getAssets({ skip, limit });
+      assets.push(...response.items);
+      if (response.items.length < limit) break;
+      skip += limit;
     }
-  });
+    console.log(`Found ${assets.length} assets.`);
+
+    let assetCount = 0;
+    await asyncPool(2, assets, async (asset) => {
+      const current = ++assetCount;
+      try {
+        if (asset.isPublished()) {
+          console.log(`[${current}/${assets.length}] Unpublishing asset: ${asset.sys.id}`);
+          await asset.unpublish();
+          await sleep(350);
+        }
+        console.log(`[${current}/${assets.length}] Deleting asset: ${asset.sys.id}`);
+        await asset.delete();
+        await sleep(350);
+      } catch (err) {
+        console.error(`Failed to delete asset ${asset.sys.id}:`, err.message);
+      }
+    });
+  }
 
   // --- Clean Up Content Types ---
   console.log('\nFetching content types...');
