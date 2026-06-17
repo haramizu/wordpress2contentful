@@ -93,6 +93,30 @@ CONTENTFUL_ENVIRONMENT=master
 
 ---
 
+### 4. Contentful 環境のセットアップ（Content Type作成）
+
+移行に必要なコンテンツモデル（Category, Tag, Blog Post）を Contentful 側に自動で作成・設定します。また、`wordpress/content/` 配下の最新のXMLファイルを検出して確認します。
+
+#### セットアップの実行
+```bash
+npm run setup
+```
+
+---
+
+### 5. メディアファイルのアップロード
+
+`wordpress/media/` 配下に解凍したメディアファイルを Contentful Asset として一括アップロードおよび公開（Publish）します。
+
+- 処理はレートリミットを考慮して安全に行われ、各ファイルは相対パスを基に一意な決定論的 ID（Deterministic ID）で登録されるため、再実行時はすでにアップロード・公開済みのファイルをスキップします。
+
+#### メディアアップロードの実行
+```bash
+npm run media-upload
+```
+
+---
+
 ## プロジェクト構成
 
 - [wordpress/](./wordpress)

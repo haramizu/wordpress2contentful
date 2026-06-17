@@ -19,8 +19,12 @@ WordPress のエクスポートデータ（XML・メディアアーカイブ）�
 - `CONTENTFUL_PREVIEW_ACCESS_TOKEN`: プレビュー用トークン（CPA / オプション）
 - `CONTENTFUL_ENVIRONMENT`: 環境名（通常は `master`）
 
-## 開発・実行手順（予定）
-今後、以下の処理を行うスクリプトを追加していく予定です：
-1. **XML パース:** `wordpress/content/` 配下のXMLエクスポートデータから投稿、カテゴリー、タグ、メディア一覧の情報を抽出する。
-2. **アセットアップロード:** 解凍したメディアファイルを Contentful Assets にアップロードし、公開する。
-3. **エントリ作成:** 記事データを Contentful の該当コンテンツモデル（Blog Post 等）として登録し、アセットへのリンクを紐付ける。
+## 開発・実行手順
+以下の手順で移行処理を進めます：
+
+1. **環境セットアップと最新XML検証 (完了):**
+   `npm run setup` でコンテンツモデル（Category, Tag, Blog Post）を自動生成し、`wordpress/content/` 配下の最新のXMLファイルを検出します。
+2. **アセットアップロード (完了):**
+   `npm run media-upload` で `wordpress/media/` 内の全ローカルメディアファイルを Contentful Assets にアップロードし、公開します。各ファイルは決定論的 ID（Deterministic ID: `wp_media_<md5_hash_of_relative_path>`）で登録され、再実行時にはアップロード済みのファイルをスキップします。
+3. **エントリ作成 (予定):**
+   最新XMLファイルをパースし、記事データを Contentful の Blog Post などの該当モデルとしてエントリ登録します。その際、アップロード済みのアセットへの参照（カテゴリ、タグ、アイキャッチ/本文中画像）を紐付けます。
