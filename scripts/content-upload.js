@@ -6,6 +6,8 @@ import dotenv from 'dotenv';
 import { XMLParser } from 'fast-xml-parser';
 import { parse as parseHtml } from 'node-html-parser';
 
+const siteUrl = 'https://haramizujp.wordpress.com';
+
 // Load environment variables
 dotenv.config({ path: path.resolve(process.cwd(), '.env.local') });
 dotenv.config({ path: path.resolve(process.cwd(), '.env') });
@@ -143,9 +145,16 @@ function convertHtmlToRichText(htmlContent, attachmentIdToAssetId) {
           for (const child of node.childNodes) {
             inlines.push(...convertNodeToInlines(child, marks));
           }
+          let uri = node.getAttribute('href') || '';
+          if (uri.startsWith(siteUrl)) {
+            uri = uri.slice(siteUrl.length);
+            if (!uri.startsWith('/')) {
+              uri = '/' + uri;
+            }
+          }
           return [{
             nodeType: 'hyperlink',
-            data: { uri: node.getAttribute('href') || '' },
+            data: { uri },
             content: inlines.length > 0 ? inlines : [{ nodeType: 'text', value: '', marks: [], data: {} }]
           }];
         }
@@ -230,8 +239,8 @@ function convertHtmlToRichText(htmlContent, attachmentIdToAssetId) {
           flushInlineBuffer();
 
           if (tagName === 'p' || tagName === 'div') {
-            const hasBlockChildren = node.childNodes.some(child => 
-              child.nodeType === 1 && 
+            const hasBlockChildren = node.childNodes.some(child =>
+              child.nodeType === 1 &&
               ['p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'ul', 'ol', 'blockquote', 'div', 'img'].includes(child.tagName.toLowerCase())
             );
 
@@ -299,8 +308,8 @@ function convertHtmlToRichText(htmlContent, attachmentIdToAssetId) {
           return;
         }
 
-        const hasBlockChildren = node.childNodes.some(child => 
-          child.nodeType === 1 && 
+        const hasBlockChildren = node.childNodes.some(child =>
+          child.nodeType === 1 &&
           ['p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'ul', 'ol', 'blockquote', 'div', 'img'].includes(child.tagName.toLowerCase())
         );
         if (hasBlockChildren) {
@@ -361,8 +370,8 @@ async function uploadContent() {
   });
   const jsonObj = parser.parse(xmlContent);
 
-  const items = Array.isArray(jsonObj.rss?.channel?.item) 
-    ? jsonObj.rss.channel.item 
+  const items = Array.isArray(jsonObj.rss?.channel?.item)
+    ? jsonObj.rss.channel.item
     : (jsonObj.rss?.channel?.item ? [jsonObj.rss.channel.item] : []);
 
   const categoriesFromXml = Array.isArray(jsonObj.rss?.channel?.['wp:category'])
@@ -493,7 +502,7 @@ async function uploadContent() {
     const richTextContent = convertHtmlToRichText(content, attachmentIdToAssetId);
     const excerpt = post['excerpt:encoded'] || '';
     const status = post['wp:status'] || 'draft';
-    
+
     // Parse publish date
     let publishDate = null;
     const rawDate = post['wp:post_date_gmt'] || post['pubDate'];
@@ -505,7 +514,7 @@ async function uploadContent() {
     const categoriesAttached = [];
     const tagsAttached = [];
     const itemCategories = Array.isArray(post.category) ? post.category : (post.category ? [post.category] : []);
-    
+
     for (const catObj of itemCategories) {
       if (catObj && catObj['@_domain'] === 'category') {
         const catSlug = catObj['@_nicename'];
@@ -548,7 +557,7 @@ async function uploadContent() {
       try {
         entry = await environment.getEntry(entryId);
         console.log(`[${current}/${posts.length}] Blog Post already exists: "${title}" (${entryId})`);
-        
+
         // Update fields
         entry.fields = {
           title: { [defaultLocale]: title },

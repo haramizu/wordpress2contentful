@@ -40,6 +40,6 @@ WordPress のエクスポートデータ（XML・メディアアーカイブ）�
      - Tag: `wp_tag_<md5_hash_of_slug>`
      - Blog Post: `wp_post_<wordpressId>`
    - **HTML からの Rich Text 変換と画像インライン埋め込み:** 記事本文（`<content:encoded>` 内の HTML）は Contentful の RichText AST 形式に自動変換されます。本文中の `<img>` タグは、決定論的メディア ID（`wp_media_...`）を用いた `embedded-asset-block` へと自動解決・変換されます。
+     - **サイト内リンクの相対パス化:** 本文中の `<a>` タグの `href` 属性に `siteUrl`（`https://haramizujp.wordpress.com`）が含まれている場合、ドメイン情報を削除して相対パスに自動変換します。
    - **リレーション自動紐付け:** カテゴリ、タグ、および featuredImage（アイキャッチ画像等）の参照リンク（References）を自動的に解決し紐付けます。
    - **ステータス自動同期:** 元の WordPress 上で `publish` ステータスの記事のみ、登録後に自動で公開（Publish）されます。
-

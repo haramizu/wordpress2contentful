@@ -162,6 +162,8 @@ npm run content-upload
 WordPress の本文（`<content:encoded>` 内の HTML）は、Contentful の `RichText` フィールドに対応する AST（抽象構文木）形式へ自動変換されます。
 - **対応要素:** 太字 (`strong`, `b`), 斜体 (`em`, `i`), 下線 (`u`), コードブロック (`code`), 改行 (`br`), リンク (`a`), 見出し (`h1`〜`h6`), リスト (`ul`, `ol`), 引用 (`blockquote`)。
 - **インライン画像の自動埋め込み化:** 本文中の `<img>` タグの `src` 属性から画像パスを抽出し、該当する Contentful アセットの決定論的 ID（`wp_media_...`）へと自動で解決し、本文中の `embedded-asset-block` (インライン埋め込みアセットブロック) として再構築します。
+- **サイト内リンクの相対パス化:** 本文中の `<a>` タグの `href` 属性に `siteUrl` (`https://haramizujp.wordpress.com`) が含まれている場合、ドメイン情報を削除して相対パス（`/` から始まる形）に自動変換します。
+
 
 ### 3. メディアメタデータの抽出と alt 属性スクレイピング
 `media-upload.js` では、以下の順序でメディアのタイトルと説明（Description）を設定します。
