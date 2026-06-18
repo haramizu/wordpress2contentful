@@ -2,19 +2,23 @@ import contentfulManagement from 'contentful-management';
 import dotenv from 'dotenv';
 import path from 'path';
 
-// Load environment variables from .env.local
+// Load environment variables from .env.local and .env
 dotenv.config({ path: path.resolve(process.cwd(), '.env.local') });
+dotenv.config({ path: path.resolve(process.cwd(), '.env') });
 
 const spaceId = process.env.CONTENTFUL_SPACE_ID;
 const cmaToken = process.env.CONTENTFUL_MANAGEMENT_TOKEN;
 const environmentId = process.env.CONTENTFUL_ENVIRONMENT || 'master';
 
 if (!spaceId || !cmaToken) {
-  console.error('Error: CONTENTFUL_SPACE_ID and CONTENTFUL_MANAGEMENT_TOKEN must be set in .env.local');
+  console.error('Error: CONTENTFUL_SPACE_ID and CONTENTFUL_MANAGEMENT_TOKEN must be set in .env.local or .env');
   process.exit(1);
 }
 
 const isConfirmed = process.argv.includes('--confirm');
+const keepAssets = process.argv.includes('--keep-assets') || process.argv.includes('--keep-media');
+
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 // A simple concurrency helper pool
 async function asyncPool(concurrency, array, iteratorFn) {
@@ -69,44 +73,81 @@ async function cleanup() {
   console.log(`Found ${entries.length} entries.`);
 
   let entryCount = 0;
-  await asyncPool(5, entries, async (entry) => {
+  await asyncPool(2, entries, async (entry) => {
     const current = ++entryCount;
     try {
       if (entry.isPublished()) {
         console.log(`[${current}/${entries.length}] Unpublishing entry: ${entry.sys.id}`);
         await entry.unpublish();
+        await sleep(350);
       }
       console.log(`[${current}/${entries.length}] Deleting entry: ${entry.sys.id}`);
       await entry.delete();
+      await sleep(350);
     } catch (err) {
       console.error(`Failed to delete entry ${entry.sys.id}:`, err.message);
     }
   });
 
   // --- Clean Up Assets ---
-  console.log('\nFetching assets...');
-  let assets = [];
+  if (keepAssets) {
+    console.log('\nSkipping asset (media) cleanup (--keep-media flag set).');
+  } else {
+    console.log('\nFetching assets...');
+    let assets = [];
+    skip = 0;
+    while (true) {
+      const response = await environment.getAssets({ skip, limit });
+      assets.push(...response.items);
+      if (response.items.length < limit) break;
+      skip += limit;
+    }
+    console.log(`Found ${assets.length} assets.`);
+
+    let assetCount = 0;
+    await asyncPool(2, assets, async (asset) => {
+      const current = ++assetCount;
+      try {
+        if (asset.isPublished()) {
+          console.log(`[${current}/${assets.length}] Unpublishing asset: ${asset.sys.id}`);
+          await asset.unpublish();
+          await sleep(350);
+        }
+        console.log(`[${current}/${assets.length}] Deleting asset: ${asset.sys.id}`);
+        await asset.delete();
+        await sleep(350);
+      } catch (err) {
+        console.error(`Failed to delete asset ${asset.sys.id}:`, err.message);
+      }
+    });
+  }
+
+  // --- Clean Up Content Types ---
+  console.log('\nFetching content types...');
+  let contentTypes = [];
   skip = 0;
   while (true) {
-    const response = await environment.getAssets({ skip, limit });
-    assets.push(...response.items);
+    const response = await environment.getContentTypes({ skip, limit });
+    contentTypes.push(...response.items);
     if (response.items.length < limit) break;
     skip += limit;
   }
-  console.log(`Found ${assets.length} assets.`);
+  console.log(`Found ${contentTypes.length} content types.`);
 
-  let assetCount = 0;
-  await asyncPool(5, assets, async (asset) => {
-    const current = ++assetCount;
+  let contentTypeCount = 0;
+  await asyncPool(2, contentTypes, async (contentType) => {
+    const current = ++contentTypeCount;
     try {
-      if (asset.isPublished()) {
-        console.log(`[${current}/${assets.length}] Unpublishing asset: ${asset.sys.id}`);
-        await asset.unpublish();
+      if (contentType.isPublished()) {
+        console.log(`[${current}/${contentTypes.length}] Unpublishing content type: ${contentType.sys.id}`);
+        await contentType.unpublish();
+        await sleep(350);
       }
-      console.log(`[${current}/${assets.length}] Deleting asset: ${asset.sys.id}`);
-      await asset.delete();
+      console.log(`[${current}/${contentTypes.length}] Deleting content type: ${contentType.sys.id}`);
+      await contentType.delete();
+      await sleep(350);
     } catch (err) {
-      console.error(`Failed to delete asset ${asset.sys.id}:`, err.message);
+      console.error(`Failed to delete content type ${contentType.sys.id}:`, err.message);
     }
   });
 

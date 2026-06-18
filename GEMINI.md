@@ -7,21 +7,39 @@ WordPress のエクスポートデータ（XML・メディアアーカイブ）�
 
 ## 移行元データ情報
 - **XML データ:** `wordpress/content/` 配下に配置された WordPress のXMLエクスポートデータ（例: `WordPress.2026-06-16.xml` など）
-- **メディアアーカイブ:** [media-export-197841949-from-0-to-1255.tar](./wordpress/media-export-197841949-from-0-to-1255.tar) (約1.6GB)
-  - 解凍先: `wordpress/media/` ディレクトリ配下
+- **メディアアーカイブ:** `wordpress/media/` は以下に配置された WordPress からエクスポートをしたメディアファイルの展開先ディレクトリです。メディアファイルが圧縮されている場合は `tar` コマンドで展開を行ってください。
 
-## 設定・環境変数 (`.env.local`)
+## 設定・環境変数 (`.env` / `.env.local`)
 移行処理には Contentful にデータを書き込むための以下の環境変数が必要です。
-ローカル開発時は [.env.local](./.env.local) に定義します。
+ローカル開発時は安全のため、より優先度の高い [.env.local](./.env.local) または [.env](./.env) に定義します。
 
 - `CONTENTFUL_SPACE_ID`: 対象スペースID
 - `CONTENTFUL_MANAGEMENT_TOKEN`: 管理用トークン（CMA / 必須）
 - `CONTENTFUL_ACCESS_TOKEN`: 閲覧用トークン（CDA / オプション）
 - `CONTENTFUL_PREVIEW_ACCESS_TOKEN`: プレビュー用トークン（CPA / オプション）
 - `CONTENTFUL_ENVIRONMENT`: 環境名（通常は `master`）
+- `CONTENTFUL_LOCALE`: デフォルトロケール名（通常は `ja-JP`）
 
-## 開発・実行手順（予定）
-今後、以下の処理を行うスクリプトを追加していく予定です：
-1. **XML パース:** `wordpress/content/` 配下のXMLエクスポートデータから投稿、カテゴリー、タグ、メディア一覧の情報を抽出する。
-2. **アセットアップロード:** 解凍したメディアファイルを Contentful Assets にアップロードし、公開する。
-3. **エントリ作成:** 記事データを Contentful の該当コンテンツモデル（Blog Post 等）として登録し、アセットへのリンクを紐付ける。
+## 開発・実行手順
+以下の手順で移行処理を進めます：
+
+0. **環境クリーンアップ (オプション・動作検証用):**
+   `npm run cleanup` で Contentful 上の全エントリー、アセット、コンテンツモデルを一括削除して初期化します。
+   - 安全対策として、実際に削除を行うには `-- --confirm` フラグが必要です。また、`--keep-media` フラグを渡すことでアセット（画像）を残すことができます。
+1. **環境セットアップと最新XML検証 (完了):**
+   `npm run setup` でコンテンツモデル（Category, Tag, Blog Post）を自動生成し、`wordpress/content/` 配下の最新のXMLファイルを検出します。
+2. **アセットアップロード (完了):**
+   `npm run media-upload` で `wordpress/media/` 内の全ローカルメディアファイルを Contentful Assets にアップロードし、公開します。
+   - **決定論的 ID:** 各アセットは、相対パスに基づいた一意なID（`wp_media_<md5_hash_of_relative_path>`）で登録され、再実行時には既にアップロード済みのファイルをスキップします。
+   - **メタデータ自動抽出:** XMLファイル内のアタッチメント情報から `title` と `description` を抽出し、Contentfulのアセット情報に設定します。
+   - **本文からの代替テキスト（alt）スクレイピング:** アタッチメント自体に説明文が存在しない画像に関しては、記事本文（`<content:encoded>`）中の `<img>` タグの `alt` 属性を自動的にスクレイピングしてアセットの `description` に補完します。
+3. **エントリ作成 (完了):**
+   `npm run content-upload` で最新XMLファイルをパースし、記事データ（Category, Tag, Blog Post）のエントリーを Contentful に登録・公開します。
+   - **決定論的 ID:** 各エントリーは、元の識別子（postIDやslug）に基づいた一意なIDで登録され、再実行時には安全に更新（上書き）されます。
+     - Category: `wp_cat_<md5_hash_of_slug>`
+     - Tag: `wp_tag_<md5_hash_of_slug>`
+     - Blog Post: `wp_post_<wordpressId>`
+   - **HTML からの Rich Text 変換と画像インライン埋め込み:** 記事本文（`<content:encoded>` 内の HTML）は Contentful の RichText AST 形式に自動変換されます。本文中の `<img>` タグは、決定論的メディア ID（`wp_media_...`）を用いた `embedded-asset-block` へと自動解決・変換されます。
+   - **リレーション自動紐付け:** カテゴリ、タグ、および featuredImage（アイキャッチ画像等）の参照リンク（References）を自動的に解決し紐付けます。
+   - **ステータス自動同期:** 元の WordPress 上で `publish` ステータスの記事のみ、登録後に自動で公開（Publish）されます。
+
