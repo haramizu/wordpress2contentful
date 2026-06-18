@@ -9,9 +9,9 @@ WordPress のエクスポートデータ（XML・メディアアーカイブ）�
 - **XML データ:** `wordpress/content/` 配下に配置された WordPress のXMLエクスポートデータ（例: `WordPress.2026-06-16.xml` など）
 - **メディアアーカイブ:** `wordpress/media/` は以下に配置された WordPress からエクスポートをしたメディアファイルの展開先ディレクトリです。メディアファイルが圧縮されている場合は `tar` コマンドで展開を行ってください。
 
-## 設定・環境変数 (`.env`)
+## 設定・環境変数 (`.env` / `.env.local`)
 移行処理には Contentful にデータを書き込むための以下の環境変数が必要です。
-ローカル開発時は [.env](./.env) に定義します。
+ローカル開発時は安全のため、より優先度の高い [.env.local](./.env.local) または [.env](./.env) に定義します。
 
 - `CONTENTFUL_SPACE_ID`: 対象スペースID
 - `CONTENTFUL_MANAGEMENT_TOKEN`: 管理用トークン（CMA / 必須）
@@ -23,6 +23,9 @@ WordPress のエクスポートデータ（XML・メディアアーカイブ）�
 ## 開発・実行手順
 以下の手順で移行処理を進めます：
 
+0. **環境クリーンアップ (オプション・動作検証用):**
+   `npm run cleanup` で Contentful 上の全エントリー、アセット、コンテンツモデルを一括削除して初期化します。
+   - 安全対策として、実際に削除を行うには `-- --confirm` フラグが必要です。また、`--keep-media` フラグを渡すことでアセット（画像）を残すことができます。
 1. **環境セットアップと最新XML検証 (完了):**
    `npm run setup` でコンテンツモデル（Category, Tag, Blog Post）を自動生成し、`wordpress/content/` 配下の最新のXMLファイルを検出します。
 2. **アセットアップロード (完了):**
@@ -32,6 +35,11 @@ WordPress のエクスポートデータ（XML・メディアアーカイブ）�
    - **本文からの代替テキスト（alt）スクレイピング:** アタッチメント自体に説明文が存在しない画像に関しては、記事本文（`<content:encoded>`）中の `<img>` タグの `alt` 属性を自動的にスクレイピングしてアセットの `description` に補完します。
 3. **エントリ作成 (完了):**
    `npm run content-upload` で最新XMLファイルをパースし、記事データ（Category, Tag, Blog Post）のエントリーを Contentful に登録・公開します。
-   - **決定論的 ID:** 各エントリーは、元の WordPress ID に基づいた一意なID（例: `wp_post_<wordpressId>`）で登録され、再実行時には安全に更新（上書き）されます。
+   - **決定論的 ID:** 各エントリーは、元の識別子（postIDやslug）に基づいた一意なIDで登録され、再実行時には安全に更新（上書き）されます。
+     - Category: `wp_cat_<md5_hash_of_slug>`
+     - Tag: `wp_tag_<md5_hash_of_slug>`
+     - Blog Post: `wp_post_<wordpressId>`
+   - **HTML からの Rich Text 変換と画像インライン埋め込み:** 記事本文（`<content:encoded>` 内の HTML）は Contentful の RichText AST 形式に自動変換されます。本文中の `<img>` タグは、決定論的メディア ID（`wp_media_...`）を用いた `embedded-asset-block` へと自動解決・変換されます。
    - **リレーション自動紐付け:** カテゴリ、タグ、および featuredImage（アイキャッチ画像等）の参照リンク（References）を自動的に解決し紐付けます。
    - **ステータス自動同期:** 元の WordPress 上で `publish` ステータスの記事のみ、登録後に自動で公開（Publish）されます。
+

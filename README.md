@@ -28,17 +28,17 @@ tar -xvf wordpress/media-export-197841949-from-0-to-1255.tar -C wordpress/media/
 
 ---
 
-### 2. 環境変数の設定 (`.env`)
+### 2. 環境変数の設定 (`.env` / `.env.local`)
 
 Contentful API にアクセスするための認証情報を設定します。
 
-プロジェクトのルートディレクトリに `.env` ファイルを作成し、必要なAPI情報を記載してください。
+プロジェクトのルートディレクトリに `.env` または `.env.local` ファイルを作成し、必要なAPI情報を記載してください。本スクリプトは、安全のために `.env` より優先して `.env.local` から環境変数を読み込みます。
 
 #### 設定用ファイル作成
 ```bash
 cp .env.example .env
 ```
-*(※ すでに `.env` が作成されている場合は、直接そちらを編集してください)*
+*(※ ローカル専用キーとして `.env.local` を作成し編集することも推奨します)*
 
 #### `.env` の設定項目
 
@@ -75,7 +75,7 @@ CONTENTFUL_LOCALE=ja-JP
 移行テストを複数回実行する場合など、Contentful 上のエントリーやアセットをすべて削除して初期状態にクリーンアップするためのスクリプトが用意されています。
 
 > [!WARNING]
-> このスクリプトは、設定されたスペースおよび環境内の**すべてのエントリーとアセットを削除**します。実行前に必ず `.env` の設定対象環境を確認してください。
+> このスクリプトは、設定されたスペースおよび環境内の**すべてのエントリー、アセット、および作成されたコンテンツモデルを削除**します。実行前に必ず `.env` の設定対象環境を確認してください。
 
 #### クリーンアップの実行手順
 
@@ -142,6 +142,39 @@ npm run content-upload
 
 ---
 
+## 移行処理の仕様と機能特徴
+
+本移行スクリプト群は、本番運用時にも安全に再実行（べき等性の担保）できるよう設計されています。
+
+### 1. 決定論的 ID (Deterministic ID) 生成規則
+二重登録やデータの重複を防ぐため、WordPress 側の識別子に基づき Contentful の ID を一意に生成（MD5ハッシュ化またはID埋め込み）して移行します。
+
+| 移行対象 | Contentful ID 生成規則 | 説明 |
+| :--- | :--- | :--- |
+| **Asset (メディア)** | `wp_media_<md5_hash_of_relative_path>` | `wordpress/media/` 内の相対パスを基に生成 |
+| **Category** | `wp_cat_<md5_hash_of_slug>` | カテゴリのスラッグ（slug）の MD5 ハッシュ値 |
+| **Tag** | `wp_tag_<md5_hash_of_slug>` | タグのスラッグ（slug）の MD5 ハッシュ値 |
+| **Blog Post** | `wp_post_<wordpressId>` | WordPress 上での投稿ID（`wp:post_id`） |
+
+これにより、途中でアップロードが失敗した場合や、WordPress 側で内容が更新されて再実行した場合にも、既存の同じ ID のエントリーを安全に上書き・更新（Update）します。
+
+### 2. HTML から Contentful Rich Text への自動変換
+WordPress の本文（`<content:encoded>` 内の HTML）は、Contentful の `RichText` フィールドに対応する AST（抽象構文木）形式へ自動変換されます。
+- **対応要素:** 太字 (`strong`, `b`), 斜体 (`em`, `i`), 下線 (`u`), コードブロック (`code`), 改行 (`br`), リンク (`a`), 見出し (`h1`〜`h6`), リスト (`ul`, `ol`), 引用 (`blockquote`)。
+- **インライン画像の自動埋め込み化:** 本文中の `<img>` タグの `src` 属性から画像パスを抽出し、該当する Contentful アセットの決定論的 ID（`wp_media_...`）へと自動で解決し、本文中の `embedded-asset-block` (インライン埋め込みアセットブロック) として再構築します。
+
+### 3. メディアメタデータの抽出と alt 属性スクレイピング
+`media-upload.js` では、以下の順序でメディアのタイトルと説明（Description）を設定します。
+1. **XML アタッチメント情報の抽出:** 最新XML内のアタッチメント情報から `title` と `description` (または `excerpt:encoded`)、および画像代替テキスト (`_wp_attachment_image_alt` ポストメタキー) を抽出します。
+2. **本文からの alt スクレイピング (フォールバック):** アタッチメント自体に説明文や代替テキストがない画像は、記事本文（`<content:encoded>`）中の `<img>` タグを走査し、同一画像名に設定されている `alt` 属性値を自動取得してアセットの `description` に補完します。
+
+### 4. API レートリミット対策と同時実行制御
+Contentful API のレートリミット（Rate Limits）による制限・エラーを回避するため、以下の対策を行っています。
+- `asyncPool` による同時実行数の制御（標準で並行数 `2`）。
+- 処理リクエスト間に一定のウェイト（`sleep(350)` など）を設けることで、API制限の発生を防ぎ安定してインポートを進めます。
+
+---
+
 ## プロジェクト構成
 
 - [wordpress/](./wordpress)
@@ -156,4 +189,5 @@ npm run content-upload
 - [.env](./.env) - ローカル環境変数設定ファイル（Git除外推奨）
 - [README.md](./README.md) - 本ファイル
 - [GEMINI.md](./GEMINI.md) - AIアシスタント向け開発コンテキスト
+
 
